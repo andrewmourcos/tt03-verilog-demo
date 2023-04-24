@@ -1,7 +1,10 @@
 `default_nettype none
 
 module andrewm_parallel_to_uart #(
-    parameters
+    parameter IDLE = 2'b00,
+    parameter READ_LSB = 2'b01,
+    parameter READ_MSB = 2'b10,
+    parameter SEND_DATA = 2'b11
 ) (
     input [7:0] io_in,
     output [7:0] io_out
@@ -9,21 +12,19 @@ module andrewm_parallel_to_uart #(
     // Define the I/O
     wire clk = io_in[0];
     wire reset = io_in[1];
-    wire data_pins = io_in[5:2];
-    wire mode = io_in[7:6];
+    wire [3:0] data_pins = io_in[5:2];
+    wire [1:0] mode = io_in[7:6];
 
     wire uart_tx;
     assign io_out[0] = uart_tx;
-
-    // Mode select codes
-    parameter IDLE = 2'b00;
-    parameter READ_LSB = 2'b01;
-    parameter READ_MSB = 2'b10;
-    parameter SEND_DATA = 2'b10;
+    assign io_out = 8'h00;
 
     reg [7:0] data;
     reg [3:0] lsb_data;
     reg [3:0] msb_data;
+    reg [2:0] bit_counter;
+    reg [7:0] baud_counter;
+    reg transmitting;
 
     always @(posedge clk) begin
         if (reset) begin
@@ -31,10 +32,14 @@ module andrewm_parallel_to_uart #(
             data <= 8'h00;
             lsb_data <= 4'h0;
             msb_data <= 4'h0;
+            bit_counter <= 3'h0;
+            baud_counter <= 8'hFF;
+            transmitting <= 1'b0;
+            uart_tx <= 1'b1;
         end else begin
             case (mode)
                 IDLE: begin
-                    #0;
+                    transmitting <= 1'b0;
                 end
                 READ_LSB: begin
                     // Read least significant bits from input pins
@@ -46,18 +51,27 @@ module andrewm_parallel_to_uart #(
                     data <= {msb_data, lsb_data};
                 end
                 SEND_DATA: begin
-                    // Transmit data over UART
-                    uart_tx <= 0; // start bit
-                    #52;
-                    integer i;
-                    for (i = 0; i < 8; i = i + 1) begin
-                        uart_tx <= data[i];
-                        #52;
+                    // Send start bit and restart counter
+                    if (!transmitting) begin
+                        transmitting <= 1'b1;
+                        baud_counter <= 8'hFF;
+                        bit_counter <= 3'h0;
+                        uart_tx <= 1'b0;
+                    end else if (baud_counter == 0) begin
+                        // Send next bit
+                        uart_tx <= data[bit_counter];
+                        bit_counter <= bit_counter + 1;
+                        baud_counter <= 8'hFF;
+                        if (bit_counter == 7) begin
+                            // End transmission
+                            transmitting <= 1'b0;
+                            uart_tx <= 1'b1; // stop bit
+                        end
+                    end else begin
+                        // Wait for next baud period
+                        baud_counter <= baud_counter - 1;
                     end
-                    uart_tx <= 1; // stop bit
-                    #104; // Hold stop bit for a little longer
                 end
-                default: #0;
             endcase
         end
     end
