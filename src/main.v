@@ -1,0 +1,111 @@
+`default_nettype none
+
+module andrewm_parallel_to_uart #(
+    parameters
+) (
+    input [7:0] io_in,
+    output [7:0] io_out
+);
+    // Define the I/O
+    wire clk = io_in[0];
+    wire reset = io_in[1];
+    wire data_pins = io_in[5:2];
+    wire mode = io_in[7:6];
+
+    wire uart_tx;
+    assign io_out[0] = uart_tx;
+
+    // Mode select codes
+    parameter IDLE = 2'b00;
+    parameter READ_LSB = 2'b01;
+    parameter READ_MSB = 2'b10;
+    parameter SEND_DATA = 2'b10;
+
+    reg [7:0] data;
+    reg [3:0] lsb_data;
+    reg [3:0] msb_data;
+
+    always @(posedge clk) begin
+        if (reset) begin
+            // Reset state machine and data registers
+            data <= 8'h00;
+            lsb_data <= 4'h0;
+            msb_data <= 4'h0;
+        end else begin
+            case (mode)
+                IDLE: begin
+                    #0;
+                end
+                READ_LSB: begin
+                    // Read least significant bits from input pins
+                    lsb_data <= data_pins;
+                end
+                READ_MSB: begin
+                    // Read most significant bits from input pins and combine with least significant bits
+                    msb_data <= data_pins;
+                    data <= {msb_data, lsb_data};
+                end
+                SEND_DATA: begin
+                    // Transmit data over UART
+                    uart_tx <= 0; // start bit
+                    #52;
+                    integer i;
+                    for (i = 0; i < 8; i = i + 1) begin
+                        uart_tx <= data[i];
+                        #52;
+                    end
+                    uart_tx <= 1; // stop bit
+                    #104; // Hold stop bit for a little longer
+                end
+                default: #0;
+            endcase
+        end
+    end
+    
+endmodule
+
+// module seven_segment_seconds #( parameter MAX_COUNT = 1000 ) (
+//   input [7:0] io_in,
+//   output [7:0] io_out
+// );
+    
+//     wire clk = io_in[0];
+//     wire reset = io_in[1];
+//     wire [6:0] led_out;
+//     assign io_out[6:0] = led_out;
+
+//     // slow clock out on the last gpio
+//     assign io_out[7] = second_counter[4];
+
+//     // external clock is 1000Hz, so need 10 bit counter
+//     reg [9:0] second_counter;
+//     reg [3:0] digit;
+
+//     always @(posedge clk) begin
+//         // if reset, set counter to 0
+//         if (reset) begin
+//             second_counter <= 0;
+//             digit <= 0;
+//         end else begin
+//             // if up to 16e6
+//             if (second_counter == MAX_COUNT) begin
+//                 // reset
+//                 second_counter <= 0;
+
+//                 // increment digit
+//                 digit <= digit + 1'b1;
+
+//                 // only count from 0 to 9
+//                 if (digit == 9)
+//                     digit <= 0;
+
+//             end else
+//                 // increment counter
+//                 second_counter <= second_counter + 1'b1;
+//         end
+//     end
+
+//     // instantiate segment display
+//     seg7 seg7(.counter(digit), .segments(led_out));
+
+// endmodule
