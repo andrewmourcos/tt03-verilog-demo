@@ -15,7 +15,7 @@ module andrewm_parallel_to_uart #(
     wire [3:0] data_pins = io_in[5:2];
     wire [1:0] mode = io_in[7:6];
 
-    wire uart_tx;
+    reg uart_tx;
     assign io_out[0] = uart_tx;
     assign io_out = 8'h00;
 
