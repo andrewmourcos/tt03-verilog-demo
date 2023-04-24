@@ -17,7 +17,6 @@ module andrewm_parallel_to_uart #(
 
     reg uart_tx;
     assign io_out[0] = uart_tx;
-    assign io_out = 8'hFF;
 
     reg [7:0] data;
     reg [3:0] lsb_data;
@@ -27,6 +26,7 @@ module andrewm_parallel_to_uart #(
     reg transmitting;
 
     always @(posedge clk) begin
+        assign io_out = 8'hFF;
         if (reset) begin
             // Reset state machine and data registers
             data <= 8'h00;
