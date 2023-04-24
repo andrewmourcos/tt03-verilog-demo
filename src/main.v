@@ -27,7 +27,6 @@ module andrewm_parallel_to_uart #(
     reg transmitting;
 
     always @(posedge clk) begin
-        assign io_out = 8'hFF;
         if (reset) begin
             // Reset state machine and data registers
             data <= 8'h00;
